@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import html2pdf from 'html2pdf.js';
 import { Download, Edit3, Eye, Plus, Sparkles } from 'lucide-react';
 import Header from '../../components/Header/Header';
@@ -12,6 +12,8 @@ const Home = () => {
     const [documentText, setDocumentText] = useState('');
     const [isPromptSubmitted, setIsPromptSubmitted] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const editableRef = useRef(null);
 
     const handleDownload = () => {
         const element = document.createElement('div');
@@ -30,29 +32,29 @@ const Home = () => {
         html2pdf().set(opt).from(element).save();
     };
 
-   const handleGenerate = async (promptText) => {
-    if (!promptText.trim()) return;
+    const handleGenerate = async (promptText) => {
+        if (!promptText.trim()) return;
 
-    setIsGenerating(true);
-    try {
-        const response = await axios.post(`${BASE_URL}/generate`, {
-            prompt: promptText,
-        });
+        setIsGenerating(true);
+        try {
+            const response = await axios.post(`${BASE_URL}/generate`, {
+                prompt: promptText,
+            });
 
-        const data = response.data;
-        setDocumentText(data.response);
-        setIsPromptSubmitted(true);
-        setPrompt(promptText);
-        setNewPrompt('');
-    } catch (error) {
-        console.error('Error:', error);
-        const errorMsg =
-            error.response?.data?.error || 'Failed to generate contract';
-        alert(errorMsg);
-    } finally {
-        setIsGenerating(false);
-    }
-};
+            const data = response.data;
+            setDocumentText(data.response);
+            setIsPromptSubmitted(true);
+            setPrompt(promptText);
+            setNewPrompt('');
+        } catch (error) {
+            console.error('Error:', error);
+            const errorMsg =
+                error.response?.data?.error || 'Failed to generate contract';
+            alert(errorMsg);
+        } finally {
+            setIsGenerating(false);
+        }
+    };
 
     const handleAddPrompt = async () => {
         if (!newPrompt.trim()) return;
@@ -83,11 +85,56 @@ const Home = () => {
         }
     };
 
+    const handleModeSwitch = () => {
+        if (mode === 'preview') {
+            setMode('edit');
+            setIsEditing(true);
+            // Small delay to ensure the ref is available and set initial content
+            setTimeout(() => {
+                if (editableRef.current) {
+                    editableRef.current.innerHTML = documentText;
+                    editableRef.current.focus();
+                }
+            }, 100);
+        } else {
+            // When switching from edit to preview, save the edited content
+            if (editableRef.current) {
+                setDocumentText(editableRef.current.innerHTML);
+            }
+            setMode('preview');
+            setIsEditing(false);
+        }
+    };
+
+    const handleSaveAndPreview = () => {
+        // Save the edited content from the contentEditable div
+        if (editableRef.current) {
+            setDocumentText(editableRef.current.innerHTML);
+        }
+        setMode('preview');
+    };
+
+    const handleEditableChange = () => {
+        // Update state in real-time as user types
+        if (editableRef.current) {
+            const currentContent = editableRef.current.innerHTML;
+            setDocumentText(currentContent);
+        }
+    };
+
+    // Function to handle when content is pasted
+    const handlePaste = (e) => {
+        e.preventDefault();
+        const text = e.clipboardData.getData('text/plain');
+        document.execCommand('insertText', false, text);
+    };
+
     const resetBuilder = () => {
         setIsPromptSubmitted(false);
         setPrompt('');
         setNewPrompt('');
         setDocumentText('');
+        setIsEditing(false);
     };
 
     return (
@@ -141,7 +188,7 @@ const Home = () => {
                                 </div>
                                 <div className="flex gap-2">
                                     <button
-                                        onClick={() => setMode(mode === 'preview' ? 'edit' : 'preview')}
+                                        onClick={handleModeSwitch}
                                         className="flex items-center px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 text-xs font-medium"
                                     >
                                         {mode === 'preview' ? <Edit3 className="h-3 w-3 mr-1" /> : <Eye className="h-3 w-3 mr-1" />}
@@ -166,15 +213,37 @@ const Home = () => {
                                     />
                                 ) : (
                                     <>
-                                        <textarea
-                                            value={documentText}
-                                            onChange={(e) => setDocumentText(e.target.value)}
-                                            className="w-full h-[450px] bg-gray-50 text-gray-900 border border-gray-300 rounded-lg p-3 text-xs resize-none"
-                                            placeholder="Edit your contract here..."
+                                        <div
+                                            ref={editableRef}
+                                            contentEditable={true}
+                                            className="w-full h-[450px] bg-white text-gray-900 border-2 border-gray-300 rounded-lg p-4 text-xs overflow-y-auto focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-text"
+                                            style={{ 
+                                                fontFamily: 'Arial, sans-serif', 
+                                                lineHeight: '1.4',
+                                                minHeight: '450px',
+                                                whiteSpace: 'pre-wrap',
+                                                wordWrap: 'break-word'
+                                            }}
+                                            onInput={handleEditableChange}
+                                            onBlur={() => {
+                                                if (editableRef.current) {
+                                                    setDocumentText(editableRef.current.innerHTML);
+                                                }
+                                            }}
+                                            onPaste={handlePaste}
+                                            onKeyDown={(e) => {
+                                                // Allow all editing keys
+                                                if (e.key === 'Tab') {
+                                                    e.preventDefault();
+                                                    document.execCommand('insertText', false, '    ');
+                                                }
+                                            }}
+                                            suppressContentEditableWarning={true}
+                                            spellCheck={true}
                                         />
                                         <div className="flex justify-end mt-2">
                                             <button
-                                                onClick={() => setMode('preview')}
+                                                onClick={handleSaveAndPreview}
                                                 className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-xs font-medium"
                                             >
                                                 Save & Preview
@@ -216,7 +285,6 @@ const Home = () => {
                 )}
             </main>
         </div>
-
     );
 };
 
