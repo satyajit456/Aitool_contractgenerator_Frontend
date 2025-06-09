@@ -141,7 +141,7 @@ const Home = () => {
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
             <Header resetBuilder={resetBuilder} isPromptSubmitted={isPromptSubmitted} />
 
-            <main className="max-w-7xl mx-auto px-6 py-8">
+            <main className="px-6 py-8">
                 {!isPromptSubmitted ? (
                     <div className="min-h-[calc(100vh-72px)] flex items-center justify-center px-6">
                         <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-gray-200 p-6 flex flex-col">
@@ -178,7 +178,7 @@ const Home = () => {
                     </div>
 
                 ) : (
-                    <div className="flex gap-6 max-w-7xl mx-auto px-6 py-8">
+                    <div className="flex gap-6  mx-auto px-6 py-8">
                         {/* Left: Contract Document */}
                         <div className="w-1/2 bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col">
                             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
@@ -216,13 +216,11 @@ const Home = () => {
                                         <div
                                             ref={editableRef}
                                             contentEditable={true}
-                                            className="w-full h-[450px] bg-white text-gray-900 border-2 border-gray-300 rounded-lg p-4 text-xs overflow-y-auto focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-text"
+                                            className="bg-gray-50 rounded-lg border p-4 max-h-[450px] overflow-y-auto text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-text"
                                             style={{ 
                                                 fontFamily: 'Arial, sans-serif', 
                                                 lineHeight: '1.4',
-                                                minHeight: '450px',
-                                                whiteSpace: 'pre-wrap',
-                                                wordWrap: 'break-word'
+                                                minHeight: '450px'
                                             }}
                                             onInput={handleEditableChange}
                                             onBlur={() => {
