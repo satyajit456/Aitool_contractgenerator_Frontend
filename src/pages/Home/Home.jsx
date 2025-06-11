@@ -10,10 +10,12 @@ const Home = () => {
     const [prompt, setPrompt] = useState('');
     const [newPrompt, setNewPrompt] = useState('');
     const [documentText, setDocumentText] = useState('');
+    const [chatHistory, setChatHistory] = useState([]);
     const [isPromptSubmitted, setIsPromptSubmitted] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const editableRef = useRef(null);
+    const chatContainerRef = useRef(null);
 
     const handleDownload = () => {
         const element = document.createElement('div');
@@ -43,13 +45,16 @@ const Home = () => {
 
             const data = response.data;
             setDocumentText(data.response);
+            setChatHistory([
+                { type: 'prompt', text: promptText, timestamp: new Date().toISOString() },
+                { type: 'summary', text: data.summary || '', timestamp: new Date().toISOString() },
+            ]);
             setIsPromptSubmitted(true);
             setPrompt(promptText);
             setNewPrompt('');
         } catch (error) {
             console.error('Error:', error);
-            const errorMsg =
-                error.response?.data?.error || 'Failed to generate contract';
+            const errorMsg = error.response?.data?.error || 'Failed to generate contract';
             alert(errorMsg);
         } finally {
             setIsGenerating(false);
@@ -59,13 +64,22 @@ const Home = () => {
     const handleAddPrompt = async () => {
         if (!newPrompt.trim()) return;
 
+        const promptText = newPrompt.trim();
+        const timestamp = new Date().toISOString();
+
+        // Add user prompt to chat history
+        setChatHistory((prev) => [
+            ...prev,
+            { type: 'prompt', text: promptText, timestamp },
+        ]);
+
         setIsGenerating(true);
         try {
             const response = await fetch(`${BASE_URL}/generate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    prompt: newPrompt,
+                    prompt: promptText,
                     existingText: documentText,
                 }),
             });
@@ -73,6 +87,10 @@ const Home = () => {
             const data = await response.json();
             if (response.ok) {
                 setDocumentText(data.response);
+                setChatHistory((prev) => [
+                    ...prev,
+                    { type: 'summary', text: data.summary || '', timestamp: new Date().toISOString() },
+                ]);
                 setNewPrompt('');
             } else {
                 alert(data.error || 'Something went wrong!');
@@ -83,13 +101,19 @@ const Home = () => {
         } finally {
             setIsGenerating(false);
         }
+
+        // Scroll to the bottom of the chat
+        setTimeout(() => {
+            if (chatContainerRef.current) {
+                chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+            }
+        }, 0);
     };
 
     const handleModeSwitch = () => {
         if (mode === 'preview') {
             setMode('edit');
             setIsEditing(true);
-            // Small delay to ensure the ref is available and set initial content
             setTimeout(() => {
                 if (editableRef.current) {
                     editableRef.current.innerHTML = documentText;
@@ -97,7 +121,6 @@ const Home = () => {
                 }
             }, 100);
         } else {
-            // When switching from edit to preview, save the edited content
             if (editableRef.current) {
                 setDocumentText(editableRef.current.innerHTML);
             }
@@ -107,7 +130,6 @@ const Home = () => {
     };
 
     const handleSaveAndPreview = () => {
-        // Save the edited content from the contentEditable div
         if (editableRef.current) {
             setDocumentText(editableRef.current.innerHTML);
         }
@@ -115,14 +137,12 @@ const Home = () => {
     };
 
     const handleEditableChange = () => {
-        // Update state in real-time as user types
         if (editableRef.current) {
             const currentContent = editableRef.current.innerHTML;
             setDocumentText(currentContent);
         }
     };
 
-    // Function to handle when content is pasted
     const handlePaste = (e) => {
         e.preventDefault();
         const text = e.clipboardData.getData('text/plain');
@@ -134,6 +154,7 @@ const Home = () => {
         setPrompt('');
         setNewPrompt('');
         setDocumentText('');
+        setChatHistory([]);
         setIsEditing(false);
     };
 
@@ -176,11 +197,10 @@ const Home = () => {
                             </button>
                         </div>
                     </div>
-
                 ) : (
-                    <div className="flex gap-6  mx-auto px-6 py-8">
-                        {/* Left: Contract Document */}
-                        <div className="w-1/2 bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col">
+                    <div className="flex gap-6 mx-auto px-6 py-8">
+                        {/* Left: Contract Document Preview/Edit */}
+                        <div className="w-2/3 bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col">
                             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
                                 <div>
                                     <h3 className="text-lg font-semibold text-gray-900">Contract Document</h3>
@@ -207,7 +227,7 @@ const Home = () => {
                             <div className="p-4 flex-grow overflow-auto">
                                 {mode === 'preview' ? (
                                     <div
-                                        className="bg-gray-50 rounded-lg border p-4 max-h-[450px] overflow-y-auto text-xs text-gray-800"
+                                        className="bg-gray-50 rounded-lg border p-4 max-h-[650px] overflow-y-auto text-xs text-gray-800"
                                         style={{ fontFamily: 'Arial, sans-serif', lineHeight: '1.4' }}
                                         dangerouslySetInnerHTML={{ __html: documentText }}
                                     />
@@ -216,11 +236,11 @@ const Home = () => {
                                         <div
                                             ref={editableRef}
                                             contentEditable={true}
-                                            className="bg-gray-50 rounded-lg border p-4 max-h-[450px] overflow-y-auto text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-text"
-                                            style={{ 
-                                                fontFamily: 'Arial, sans-serif', 
+                                            className="bg-gray-50 rounded-lg border p-4 max-h-[650px] overflow-y-auto text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-text"
+                                            style={{
+                                                fontFamily: 'Arial, sans-serif',
                                                 lineHeight: '1.4',
-                                                minHeight: '450px'
+                                                minHeight: '650px',
                                             }}
                                             onInput={handleEditableChange}
                                             onBlur={() => {
@@ -230,7 +250,6 @@ const Home = () => {
                                             }}
                                             onPaste={handlePaste}
                                             onKeyDown={(e) => {
-                                                // Allow all editing keys
                                                 if (e.key === 'Tab') {
                                                     e.preventDefault();
                                                     document.execCommand('insertText', false, '    ');
@@ -252,33 +271,65 @@ const Home = () => {
                             </div>
                         </div>
 
-                        {/* Right: Modify Contract Requirements */}
-                        <div className="w-1/2 bg-white rounded-xl shadow-lg border border-gray-200 p-6 flex flex-col">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-2 flex items-center">
+                        {/* Right: Chat-Style Summary and Prompt Area */}
+                        <div className="w-1/3 bg-white rounded-xl shadow-lg border border-gray-200 p-6 flex flex-col ">
+                            <h3 className="text-md font-semibold text-gray-900 mb-2 flex items-center">
                                 <Plus className="h-4 w-4 mr-2 text-indigo-600" />
-                                Modify Contract Requirements
+                                 Summary
                             </h3>
+
                             <p className="text-xs text-gray-600 mb-4">
-                                Add additional requirements, modifications, or specific clauses to enhance your contract
+                                View a summary of your contract and add modifications
                             </p>
-                            <textarea
-                                rows={3}
-                                value={newPrompt}
-                                onChange={(e) => setNewPrompt(e.target.value)}
-                                className="w-full bg-gray-50 text-gray-900 border border-gray-300 rounded-lg p-3 text-xs placeholder-gray-500 resize-none"
-                                placeholder="Example: Add a confidentiality clause, modify payment terms..."
-                            />
-                            <div className="flex justify-end mt-auto pt-4">
-                                <button
-                                    onClick={handleAddPrompt}
-                                    disabled={!newPrompt.trim() || isGenerating}
-                                    className="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center space-x-2 text-sm"
-                                >
-                                    <Sparkles className="h-4 w-4" />
-                                    <span>{isGenerating ? 'Updating...' : 'Update Contract'}</span>
-                                </button>
+
+                            {/* Chat/Summary Scrollable Area */}
+                            <div
+                                ref={chatContainerRef}
+                                className="flex-grow overflow-y-auto mb-4 flex flex-col space-y-2 max-h-[455px]"
+                            >
+                                {chatHistory.length > 0 ? (
+                                    chatHistory.map((message, index) => (
+                                        <div
+                                            key={index}
+                                            className={`text-xs p-3 rounded-lg shadow-sm max-w-[80%] ${message.type === 'prompt'
+                                                    ? 'bg-gray-100 text-gray-800 mr-auto'
+                                                    : 'bg-indigo-50 text-gray-800 ml-auto'
+                                                }`}
+                                            style={{ fontFamily: 'Arial, sans-serif', lineHeight: '1.4' }}
+                                            dangerouslySetInnerHTML={{
+                                                __html: message.text
+                                                    .replace(/\*\s*/g, '')
+                                                    .replace(/\n/g, '<br />'),
+                                            }}
+                                        />
+                                    ))
+                                ) : (
+                                    <div className="text-xs text-gray-600">No summary available.</div>
+                                )}
+                            </div>
+
+                            {/* Bottom Section */}
+                            <div className="mt-auto">
+                                <textarea
+                                    rows={3}
+                                    value={newPrompt}
+                                    onChange={(e) => setNewPrompt(e.target.value)}
+                                    className="w-full bg-gray-50 text-gray-900 border border-gray-300 rounded-lg p-3 text-xs placeholder-gray-500 resize-none"
+                                    placeholder="Add a clause, modify terms, etc."
+                                />
+                                <div className="flex justify-end mt-4">
+                                    <button
+                                        onClick={handleAddPrompt}
+                                        disabled={!newPrompt.trim() || isGenerating}
+                                        className="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center space-x-2 text-sm"
+                                    >
+                                        <Sparkles className="h-4 w-4" />
+                                        <span>{isGenerating ? 'Updating...' : 'Update Contract'}</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
+
                     </div>
                 )}
             </main>
